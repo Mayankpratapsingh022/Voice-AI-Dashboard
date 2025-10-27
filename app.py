@@ -66,12 +66,12 @@ class UltravoxTwilioCallSystem:
     """Complete Ultravox-Twilio call system with ElevenLabs TTS integration."""
     
     def __init__(self):
-        # Load credentials from environment variables
-        self.twilio_account_sid = os.getenv('TWILIO_ACCOUNT_SID')
-        self.twilio_auth_token = os.getenv('TWILIO_AUTH_TOKEN')
-        self.ultravox_api_key = os.getenv('ULTRAVOX_API_KEY')
-        self.elevenlabs_api_key = os.getenv('ELEVENLABS_API_KEY')
-        self.ultravox_api_url = os.getenv('ULTRAVOX_API_URL', 'https://api.ultravox.ai/api/calls')
+        # Load credentials from Streamlit secrets or environment variables as fallback
+        self.twilio_account_sid = st.secrets.get('TWILIO_ACCOUNT_SID') or os.getenv('TWILIO_ACCOUNT_SID')
+        self.twilio_auth_token = st.secrets.get('TWILIO_AUTH_TOKEN') or os.getenv('TWILIO_AUTH_TOKEN')
+        self.ultravox_api_key = st.secrets.get('ULTRAVOX_API_KEY') or os.getenv('ULTRAVOX_API_KEY')
+        self.elevenlabs_api_key = st.secrets.get('ELEVENLABS_API_KEY') or os.getenv('ELEVENLABS_API_KEY')
+        self.ultravox_api_url = st.secrets.get('ULTRAVOX_API_URL') or os.getenv('ULTRAVOX_API_URL', 'https://api.ultravox.ai/api/calls')
         
         # Load configuration from JSON file
         self.customer_info = {}
@@ -108,11 +108,11 @@ class UltravoxTwilioCallSystem:
         
         # Check for optional configurations
         optional_missing = []
-        if not os.getenv('OPENAI_API_KEY'):
+        if not (st.secrets.get('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY')):
             optional_missing.append("OPENAI_API_KEY")
-        if not os.getenv('ANTHROPIC_API_KEY'):
+        if not (st.secrets.get('ANTHROPIC_API_KEY') or os.getenv('ANTHROPIC_API_KEY')):
             optional_missing.append("ANTHROPIC_API_KEY")
-        if not os.getenv('GOOGLE_API_KEY'):
+        if not (st.secrets.get('GOOGLE_API_KEY') or os.getenv('GOOGLE_API_KEY')):
             optional_missing.append("GOOGLE_API_KEY")
             
         return missing, optional_missing
@@ -378,6 +378,12 @@ def main():
     
     # Configuration Status
     st.markdown('<h2 class="section-header">Configuration Status</h2>', unsafe_allow_html=True)
+    
+    # Show secrets source
+    try:
+        st.info("🔐 **Using Streamlit Secrets** (from `streamlit/secrets.toml`)")
+    except:
+        st.warning("⚠️ **Using Environment Variables** (from `.env` file)")
     
     missing_creds, optional_missing = st.session_state.call_system.validate_credentials()
     
