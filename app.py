@@ -62,11 +62,13 @@ class UltravoxTwilioCallSystem:
     
     def __init__(self):
         # Load credentials from Streamlit secrets only
-        self.twilio_account_sid = st.secrets.get('TWILIO_ACCOUNT_SID')
-        self.twilio_auth_token = st.secrets.get('TWILIO_AUTH_TOKEN')
-        self.ultravox_api_key = st.secrets.get('ULTRAVOX_API_KEY')
-        self.elevenlabs_api_key = st.secrets.get('ELEVENLABS_API_KEY')
-        self.ultravox_api_url = st.secrets.get('ULTRAVOX_API_URL', 'https://api.ultravox.ai/api/calls')
+        # Access secrets directly since they're under [secrets] section
+        secrets = st.secrets.get("secrets", {})
+        self.twilio_account_sid = secrets.get('TWILIO_ACCOUNT_SID')
+        self.twilio_auth_token = secrets.get('TWILIO_AUTH_TOKEN')
+        self.ultravox_api_key = secrets.get('ULTRAVOX_API_KEY')
+        self.elevenlabs_api_key = secrets.get('ELEVENLABS_API_KEY')
+        self.ultravox_api_url = secrets.get('ULTRAVOX_API_URL', 'https://api.ultravox.ai/api/calls')
         
         # Load configuration from JSON file
         self.customer_info = {}
@@ -103,11 +105,12 @@ class UltravoxTwilioCallSystem:
         
         # Check for optional configurations
         optional_missing = []
-        if not st.secrets.get('OPENAI_API_KEY'):
+        secrets = st.secrets.get("secrets", {})
+        if not secrets.get('OPENAI_API_KEY'):
             optional_missing.append("OPENAI_API_KEY")
-        if not st.secrets.get('ANTHROPIC_API_KEY'):
+        if not secrets.get('ANTHROPIC_API_KEY'):
             optional_missing.append("ANTHROPIC_API_KEY")
-        if not st.secrets.get('GOOGLE_API_KEY'):
+        if not secrets.get('GOOGLE_API_KEY'):
             optional_missing.append("GOOGLE_API_KEY")
             
         return missing, optional_missing
@@ -413,11 +416,11 @@ def main():
     # Call Controls
     st.markdown('<h2 class="section-header">Call Controls</h2>', unsafe_allow_html=True)
     
-    if st.button("🚀 Initiate Call", type="primary", use_container_width=True):
+    if st.button("Initiate Call", type="primary", use_container_width=True):
             missing_creds, optional_missing = st.session_state.call_system.validate_credentials()
             
             if missing_creds:
-                st.error(f"⚠️ **Required API keys missing:** {', '.join(missing_creds)}")
+                st.error(f"⚠️ **Required sAPI keys missing:** {', '.join(missing_creds)}")
                 st.info("Please add these to your `streamlit/secrets.toml` file")
             
             if optional_missing:
