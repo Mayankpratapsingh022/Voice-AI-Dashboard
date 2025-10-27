@@ -71,9 +71,9 @@ class UltravoxTwilioCallSystem:
         self.ultravox_api_url = secrets.get('ULTRAVOX_API_URL', 'https://api.ultravox.ai/api/calls')
         
         # Load configuration from JSON file
-        self.customer_info = {}
-        self.call_settings = {}
-        self.ai_prompt = ""
+        self.use_cases = {}
+        self.default_use_case = ""
+        self.current_use_case = ""
         self._load_call_config()
     
     def _load_call_config(self):
@@ -82,14 +82,52 @@ class UltravoxTwilioCallSystem:
             with open('call_config.json', 'r', encoding='utf-8') as f:
                 config = json.load(f)
             
-            self.customer_info = config.get('customer_info', {})
-            self.call_settings = config.get('call_settings', {})
-            self.ai_prompt = config.get('ai_prompt', '')
+            self.use_cases = config.get('use_cases', {})
+            self.default_use_case = config.get('default_use_case', 'emi_collection')
+            self.current_use_case = self.default_use_case
             
         except FileNotFoundError:
             st.error("call_config.json not found. Please create the configuration file.")
         except json.JSONDecodeError as e:
             st.error(f"Error parsing call_config.json: {e}")
+    
+    def get_current_config(self):
+        """Get configuration for the current use case."""
+        if self.current_use_case in self.use_cases:
+            return self.use_cases[self.current_use_case]
+        return {}
+    
+    def get_customer_info(self):
+        """Get customer info for current use case."""
+        config = self.get_current_config()
+        return config.get('customer_info', {})
+    
+    def get_call_settings(self):
+        """Get call settings for current use case."""
+        config = self.get_current_config()
+        return config.get('call_settings', {})
+    
+    def get_ai_prompt(self):
+        """Get AI prompt for current use case."""
+        config = self.get_current_config()
+        return config.get('ai_prompt', '')
+    
+    def get_use_case_names(self):
+        """Get list of available use case names."""
+        return list(self.use_cases.keys())
+    
+    def get_use_case_info(self, use_case_key):
+        """Get use case information."""
+        if use_case_key in self.use_cases:
+            use_case = self.use_cases[use_case_key]
+            return {
+                'name': use_case.get('name', use_case_key),
+                'description': use_case.get('description', ''),
+                'customer_info': use_case.get('customer_info', {}),
+                'call_settings': use_case.get('call_settings', {}),
+                'ai_prompt': use_case.get('ai_prompt', '')
+            }
+        return {}
     
     def validate_credentials(self):
         """Validate that all required credentials are set"""
@@ -103,17 +141,7 @@ class UltravoxTwilioCallSystem:
         if not self.elevenlabs_api_key:
             missing.append("ELEVENLABS_API_KEY")
         
-        # Check for optional configurations
-        optional_missing = []
-        secrets = st.secrets.get("secrets", {})
-        if not secrets.get('OPENAI_API_KEY'):
-            optional_missing.append("OPENAI_API_KEY")
-        if not secrets.get('ANTHROPIC_API_KEY'):
-            optional_missing.append("ANTHROPIC_API_KEY")
-        if not secrets.get('GOOGLE_API_KEY'):
-            optional_missing.append("GOOGLE_API_KEY")
-            
-        return missing, optional_missing
+        return missing
     
     def get_formatted_prompt(self, prompt_template, customer_data):
         """Format the AI prompt with customer data substituted."""
@@ -269,6 +297,33 @@ def main():
         st.session_state.custom_params = []
     if 'call_history' not in st.session_state:
         st.session_state.call_history = []
+    if 'selected_use_case' not in st.session_state:
+        st.session_state.selected_use_case = st.session_state.call_system.default_use_case
+    
+    # Use Case Selection
+    st.markdown('<h2 class="section-header">Use Case Selection</h2>', unsafe_allow_html=True)
+    
+    use_case_options = {}
+    for key in st.session_state.call_system.get_use_case_names():
+        use_case_info = st.session_state.call_system.get_use_case_info(key)
+        use_case_options[key] = f"{use_case_info['name']} - {use_case_info['description']}"
+    
+    selected_use_case = st.selectbox(
+        "Select Use Case",
+        options=list(use_case_options.keys()),
+        format_func=lambda x: use_case_options[x],
+        index=list(use_case_options.keys()).index(st.session_state.selected_use_case) if st.session_state.selected_use_case in use_case_options else 0
+    )
+    
+    # Update current use case if changed
+    if selected_use_case != st.session_state.selected_use_case:
+        st.session_state.selected_use_case = selected_use_case
+        st.session_state.call_system.current_use_case = selected_use_case
+        st.rerun()
+    
+    # Show current use case info
+    current_info = st.session_state.call_system.get_use_case_info(selected_use_case)
+    st.info(f"**Current Use Case:** {current_info['name']} - {current_info['description']}")
     
     # Main content area
     col1, col2 = st.columns([2, 1])
@@ -277,14 +332,14 @@ def main():
         # Basic Configuration
         st.markdown('<h2 class="section-header">Call Configuration</h2>', unsafe_allow_html=True)
         
-        destination_phone = st.text_input("Destination Phone Number", value=st.session_state.call_system.customer_info.get('phone_number', ''), help="Phone number to call (include country code)")
-        twilio_phone = st.text_input("Twilio Phone Number", value=st.session_state.call_system.call_settings.get('twilio_phone_number', '+16416663498'), help="Your Twilio phone number")
+        destination_phone = st.text_input("Destination Phone Number", value=st.session_state.call_system.get_customer_info().get('phone_number', ''), help="Phone number to call (include country code)")
+        twilio_phone = st.text_input("Twilio Phone Number", value=st.session_state.call_system.get_call_settings().get('twilio_phone_number', '+16416663498'), help="Your Twilio phone number")
         
         # Voice Configuration
         st.markdown('<h3 class="section-header">Voice Settings</h3>', unsafe_allow_html=True)
         
         # Get voice config from JSON
-        json_voice_config = st.session_state.call_system.call_settings.get('voice', {})
+        json_voice_config = st.session_state.call_system.get_call_settings().get('voice', {})
         
         if isinstance(json_voice_config, dict) and json_voice_config.get('provider') == 'elevenlabs':
             voice_provider = st.selectbox("Voice Provider", ["elevenlabs", "built-in"], index=0)
@@ -311,13 +366,13 @@ def main():
         # AI Model Configuration
         st.markdown('<h3 class="section-header">AI Model Settings</h3>', unsafe_allow_html=True)
         
-        temperature = st.slider("Temperature", 0.0, 1.0, st.session_state.call_system.call_settings.get('temperature', 0.3), 0.1)
+        temperature = st.slider("Temperature", 0.0, 1.0, st.session_state.call_system.get_call_settings().get('temperature', 0.3), 0.1)
         
         # Customer Information
         st.markdown('<h2 class="section-header">Customer Information</h2>', unsafe_allow_html=True)
         
-        customer_name = st.text_input("Customer Name", value=st.session_state.call_system.customer_info.get('name', 'Amit Lodha'))
-        customer_gender = st.selectbox("Gender", ["Male", "Female"], index=["Male", "Female"].index(st.session_state.call_system.customer_info.get('gender', 'Male')))
+        customer_name = st.text_input("Customer Name", value=st.session_state.call_system.get_customer_info().get('name', 'Amit Lodha'))
+        customer_gender = st.selectbox("Gender", ["Male", "Female"], index=["Male", "Female"].index(st.session_state.call_system.get_customer_info().get('gender', 'Male')))
         
         # Dynamic Custom Parameters
         st.markdown('<h3 class="section-header">Custom Parameters</h3>', unsafe_allow_html=True)
@@ -353,12 +408,12 @@ def main():
         st.markdown('<h2 class="section-header">System Prompt</h2>', unsafe_allow_html=True)
         
         # Load prompt from JSON config
-        system_prompt = st.text_area("System Prompt", value=st.session_state.call_system.ai_prompt, height=400)
+        system_prompt = st.text_area("System Prompt", value=st.session_state.call_system.get_ai_prompt(), height=400)
         
         # Generate formatted prompt
         if st.button("Preview Formatted Prompt"):
             # Create customer data dictionary using JSON config as base
-            customer_data = st.session_state.call_system.customer_info.copy()
+            customer_data = st.session_state.call_system.get_customer_info().copy()
             customer_data.update({
                 "name": customer_name,
                 "phone_number": destination_phone,
@@ -380,56 +435,35 @@ def main():
     # Show secrets source
     st.info("🔐 **Using Streamlit Secrets** (from `streamlit/secrets.toml`)")
     
-    missing_creds, optional_missing = st.session_state.call_system.validate_credentials()
+    missing_creds = st.session_state.call_system.validate_credentials()
     
-    col_status1, col_status2 = st.columns(2)
+    st.subheader("✅ Required APIs")
+    required_apis = [
+        ("TWILIO_ACCOUNT_SID", "Twilio Account"),
+        ("TWILIO_AUTH_TOKEN", "Twilio Auth"),
+        ("ULTRAVOX_API_KEY", "Ultravox API"),
+        ("ELEVENLABS_API_KEY", "ElevenLabs API")
+    ]
     
-    with col_status1:
-        st.subheader("✅ Required APIs")
-        required_apis = [
-            ("TWILIO_ACCOUNT_SID", "Twilio Account"),
-            ("TWILIO_AUTH_TOKEN", "Twilio Auth"),
-            ("ULTRAVOX_API_KEY", "Ultravox API"),
-            ("ELEVENLABS_API_KEY", "ElevenLabs API")
-        ]
-        
-        for api_key, api_name in required_apis:
-            if api_key not in missing_creds:
-                st.success(f"✅ {api_name}")
-            else:
-                st.error(f"❌ {api_name}")
-    
-    with col_status2:
-        st.subheader("💡 Optional APIs")
-        optional_apis = [
-            ("OPENAI_API_KEY", "OpenAI API"),
-            ("ANTHROPIC_API_KEY", "Anthropic API"),
-            ("GOOGLE_API_KEY", "Google API")
-        ]
-        
-        for api_key, api_name in optional_apis:
-            if api_key not in optional_missing:
-                st.success(f"✅ {api_name}")
-            else:
-                st.info(f"ℹ️ {api_name} (not configured)")
+    for api_key, api_name in required_apis:
+        if api_key not in missing_creds:
+            st.success(f"✅ {api_name}")
+        else:
+            st.error(f"❌ {api_name}")
     
     # Call Controls
     st.markdown('<h2 class="section-header">Call Controls</h2>', unsafe_allow_html=True)
     
     if st.button("Initiate Call", type="primary", use_container_width=True):
-            missing_creds, optional_missing = st.session_state.call_system.validate_credentials()
+            missing_creds = st.session_state.call_system.validate_credentials()
             
             if missing_creds:
-                st.error(f"⚠️ **Required sAPI keys missing:** {', '.join(missing_creds)}")
+                st.error(f"⚠️ **Required API keys missing:** {', '.join(missing_creds)}")
                 st.info("Please add these to your `streamlit/secrets.toml` file")
-            
-            if optional_missing:
-                st.warning(f"💡 **Optional API keys not configured:** {', '.join(optional_missing)}")
-                st.info("These are optional but may be needed for advanced features")
             
             if not missing_creds:
                 # Create customer data dictionary using JSON config as base
-                customer_data = st.session_state.call_system.customer_info.copy()
+                customer_data = st.session_state.call_system.get_customer_info().copy()
                 customer_data.update({
                     "name": customer_name,
                     "phone_number": destination_phone,
