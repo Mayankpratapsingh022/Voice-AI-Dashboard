@@ -1,0 +1,19 @@
+# Streamlit Web App Requirements
+streamlit>=1.28.0
+
+# Core dependencies for Ultravox + ElevenLabs TTS integration
+requests>=2.31.0
+twilio>=8.10.0
+python-dotenv>=1.0.0
+
+# Optional dependencies for enhanced functionality
+openai>=1.0.0  # For future phone number extraction if needed
+websockets>=11.0.0  # For real-time WebSocket connections
+asyncio>=3.4.3  # For async operations
+aiohttp>=3.8.0  # For async HTTP requests
+
+# Development and testing dependencies
+pytest>=7.0.0  # For testing
+pytest-asyncio>=0.21.0  # For async testing
+black>=23.0.0  # Code formatting
+flake8>=6.0.0  # Linting
