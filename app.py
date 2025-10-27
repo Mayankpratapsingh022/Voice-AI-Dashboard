@@ -105,7 +105,17 @@ class UltravoxTwilioCallSystem:
             missing.append("ULTRAVOX_API_KEY")
         if not self.elevenlabs_api_key:
             missing.append("ELEVENLABS_API_KEY")
-        return missing
+        
+        # Check for optional configurations
+        optional_missing = []
+        if not os.getenv('OPENAI_API_KEY'):
+            optional_missing.append("OPENAI_API_KEY")
+        if not os.getenv('ANTHROPIC_API_KEY'):
+            optional_missing.append("ANTHROPIC_API_KEY")
+        if not os.getenv('GOOGLE_API_KEY'):
+            optional_missing.append("GOOGLE_API_KEY")
+            
+        return missing, optional_missing
     
     def get_formatted_prompt(self, prompt_template, customer_data):
         """Format the AI prompt with customer data substituted."""
@@ -366,14 +376,57 @@ def main():
             
             st.text_area("Formatted Prompt Preview", value=formatted_prompt, height=200)
     
+    # Configuration Status
+    st.markdown('<h2 class="section-header">Configuration Status</h2>', unsafe_allow_html=True)
+    
+    missing_creds, optional_missing = st.session_state.call_system.validate_credentials()
+    
+    col_status1, col_status2 = st.columns(2)
+    
+    with col_status1:
+        st.subheader("✅ Required APIs")
+        required_apis = [
+            ("TWILIO_ACCOUNT_SID", "Twilio Account"),
+            ("TWILIO_AUTH_TOKEN", "Twilio Auth"),
+            ("ULTRAVOX_API_KEY", "Ultravox API"),
+            ("ELEVENLABS_API_KEY", "ElevenLabs API")
+        ]
+        
+        for api_key, api_name in required_apis:
+            if api_key not in missing_creds:
+                st.success(f"✅ {api_name}")
+            else:
+                st.error(f"❌ {api_name}")
+    
+    with col_status2:
+        st.subheader("💡 Optional APIs")
+        optional_apis = [
+            ("OPENAI_API_KEY", "OpenAI API"),
+            ("ANTHROPIC_API_KEY", "Anthropic API"),
+            ("GOOGLE_API_KEY", "Google API")
+        ]
+        
+        for api_key, api_name in optional_apis:
+            if api_key not in optional_missing:
+                st.success(f"✅ {api_name}")
+            else:
+                st.info(f"ℹ️ {api_name} (not configured)")
+    
     # Call Controls
     st.markdown('<h2 class="section-header">Call Controls</h2>', unsafe_allow_html=True)
     
     if st.button("🚀 Initiate Call", type="primary", use_container_width=True):
-            missing_creds = st.session_state.call_system.validate_credentials()
+            missing_creds, optional_missing = st.session_state.call_system.validate_credentials()
+            
             if missing_creds:
-                st.error("⚠️ API keys not configured. Please check your .env file and ensure all required keys are set.")
-            else:
+                st.error(f"⚠️ **Required API keys missing:** {', '.join(missing_creds)}")
+                st.info("Please add these to your `.env` file or `streamlit/secrets.toml`")
+            
+            if optional_missing:
+                st.warning(f"💡 **Optional API keys not configured:** {', '.join(optional_missing)}")
+                st.info("These are optional but may be needed for advanced features")
+            
+            if not missing_creds:
                 # Create customer data dictionary using JSON config as base
                 customer_data = st.session_state.call_system.customer_info.copy()
                 customer_data.update({
