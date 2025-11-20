@@ -1,7 +1,12 @@
 # Voice AI Dashboard
 
 ## Overview
-Voice AI Dashboard is a Streamlit interface that lets operators configure and trigger outbound phone calls powered by Ultravox conversational AI, ElevenLabs text to speech, and Twilio voice streaming. Call templates are stored in `call_config.json`, while API credentials are loaded from `.streamlit/secrets.toml`. A hosted demo is available at https://voice-ai-dashboard-9fapwwnk9amveuzwawkucr.streamlit.app/.
+Voice AI Dashboard is a Streamlit interface that lets operators configure and trigger outbound phone calls powered by Ultravox conversational AI, ElevenLabs text to speech, and Twilio voice streaming. Call templates are stored in `call_config.json`, while API credentials are loaded from `.streamlit/secrets.toml`. 
+
+
+<img width="2516" height="1196" alt="Screenshot 2025-11-20 at 6 19 15 PM" src="https://github.com/user-attachments/assets/3e454420-92ba-4e80-8042-c98b17961640" />
+
+A hosted demo is available at https://voice-ai-dashboard-9fapwwnk9amveuzwawkucr.streamlit.app/.
 
 ## Prerequisites
 1. Install Python 3.9 or newer.
