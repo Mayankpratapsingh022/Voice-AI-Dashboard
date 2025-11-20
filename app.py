@@ -10,14 +10,11 @@ import time
 import json
 from twilio.rest import Client
 from twilio.twiml.voice_response import VoiceResponse, Connect
-from typing import Dict, Any, Optional
-import threading
 from datetime import datetime
 
 # Page configuration
 st.set_page_config(
     page_title="Voice Call System",
-    page_icon="📞",
     layout="wide"
 )
 
@@ -278,12 +275,10 @@ class UltravoxTwilioCallSystem:
         }
     
     def print_config_summary(self, customer_name, destination_phone, voice_config):
-        """Print configuration summary"""
+        """Print minimal configuration summary"""
         st.info(f"""
-        **Configuration Summary:**
+        **Call Details:**
         - **Calling:** {destination_phone} ({customer_name})
-        - **Voice:** {voice_config.get('provider', 'built-in')} - {voice_config.get('voiceId', voice_config.get('voice', 'Unknown'))}
-        - **Model:** fixie-ai/ultravox
         """)
 
 def main():
@@ -325,131 +320,84 @@ def main():
     current_info = st.session_state.call_system.get_use_case_info(selected_use_case)
     st.info(f"**Current Use Case:** {current_info['name']} - {current_info['description']}")
     
-    # Main content area
-    col1, col2 = st.columns([2, 1])
+    # Basic Configuration
+    st.markdown('<h2 class="section-header">Call Configuration</h2>', unsafe_allow_html=True)
     
-    with col1:
-        # Basic Configuration
-        st.markdown('<h2 class="section-header">Call Configuration</h2>', unsafe_allow_html=True)
-        
-        destination_phone = st.text_input("Destination Phone Number", value=st.session_state.call_system.get_customer_info().get('phone_number', ''), help="Phone number to call (include country code)")
-        twilio_phone = st.text_input("Twilio Phone Number", value=st.session_state.call_system.get_call_settings().get('twilio_phone_number', '+16416663498'), help="Your Twilio phone number")
-        
-        # Voice Configuration
-        st.markdown('<h3 class="section-header">Voice Settings</h3>', unsafe_allow_html=True)
-        
-        # Get voice config from JSON
-        json_voice_config = st.session_state.call_system.get_call_settings().get('voice', {})
-        
-        if isinstance(json_voice_config, dict) and json_voice_config.get('provider') == 'elevenlabs':
-            voice_provider = st.selectbox("Voice Provider", ["elevenlabs", "built-in"], index=0)
-        else:
-            voice_provider = st.selectbox("Voice Provider", ["elevenlabs", "built-in"], index=1)
-        
-        voice_config = {}
-        if voice_provider == "elevenlabs":
-            voice_id = st.text_input("ElevenLabs Voice ID", value=json_voice_config.get('voiceId', 'z3L1naUiX6l4xiMWzigO'))
-            voice_model = st.selectbox("ElevenLabs Model", ["eleven_turbo_v2_5", "eleven_multilingual_v2", "eleven_monolingual_v1"], 
-                                     index=["eleven_turbo_v2_5", "eleven_multilingual_v2", "eleven_monolingual_v1"].index(json_voice_config.get('model', 'eleven_turbo_v2_5')))
-            voice_config = {
-                "provider": "elevenlabs",
-                "voiceId": voice_id,
-                "model": voice_model
-            }
-        else:
-            built_in_voice = st.text_input("Built-in Voice Name", value=json_voice_config.get('voice', 'Maansvi'))
-            voice_config = {
-                "provider": "built-in",
-                "voice": built_in_voice
-            }
-        
-        # AI Model Configuration
-        st.markdown('<h3 class="section-header">AI Model Settings</h3>', unsafe_allow_html=True)
-        
-        temperature = st.slider("Temperature", 0.0, 1.0, st.session_state.call_system.get_call_settings().get('temperature', 0.3), 0.1)
-        
-        # Customer Information
-        st.markdown('<h2 class="section-header">Customer Information</h2>', unsafe_allow_html=True)
-        
-        customer_name = st.text_input("Customer Name", value=st.session_state.call_system.get_customer_info().get('name', 'Amit Lodha'))
-        customer_gender = st.selectbox("Gender", ["Male", "Female"], index=["Male", "Female"].index(st.session_state.call_system.get_customer_info().get('gender', 'Male')))
-        
-        # Dynamic Custom Parameters
-        st.markdown('<h3 class="section-header">Custom Parameters</h3>', unsafe_allow_html=True)
-        
-        col_param1, col_param2, col_param3 = st.columns([2, 2, 1])
-        
-        with col_param1:
-            param_key = st.text_input("Parameter Key", placeholder="e.g., loan_amount")
-        with col_param2:
-            param_value = st.text_input("Parameter Value", placeholder="e.g., 50000")
-        with col_param3:
-            if st.button("Add Parameter"):
-                if param_key and param_value:
-                    st.session_state.custom_params.append({"key": param_key, "value": param_value})
+    destination_phone = st.text_input(
+        "Destination Phone Number",
+        value=st.session_state.call_system.get_customer_info().get('phone_number', ''),
+        help="Phone number to call (include country code)"
+    )
+    
+    call_settings = st.session_state.call_system.get_call_settings()
+    twilio_phone = call_settings.get('twilio_phone_number', '+16416663498')
+    st.text_input(
+        "Twilio Phone Number",
+        value=twilio_phone,
+        help="Configured Twilio phone number used to place calls",
+        disabled=True
+    )
+    st.caption(f"You will receive a call from {twilio_phone}.")
+    
+    # Voice configuration is read-only and comes from call_config.json
+    json_voice_config = call_settings.get('voice', {})
+    if isinstance(json_voice_config, dict):
+        voice_config = json_voice_config
+    else:
+        voice_config = {
+            "provider": "built-in",
+            "voice": json_voice_config or "Maansvi"
+        }
+    
+    # AI Model Configuration
+    st.markdown('<h3 class="section-header">AI Model Settings</h3>', unsafe_allow_html=True)
+    
+    temperature = st.slider("Temperature", 0.0, 1.0, st.session_state.call_system.get_call_settings().get('temperature', 0.3), 0.1)
+    
+    # Customer Information
+    st.markdown('<h2 class="section-header">Customer Information</h2>', unsafe_allow_html=True)
+    
+    customer_name = st.text_input("Customer Name", value=st.session_state.call_system.get_customer_info().get('name', 'Amit Lodha'))
+    customer_gender = st.selectbox("Gender", ["Male", "Female"], index=["Male", "Female"].index(st.session_state.call_system.get_customer_info().get('gender', 'Male')))
+    
+    # Dynamic Custom Parameters
+    st.markdown('<h3 class="section-header">Custom Parameters</h3>', unsafe_allow_html=True)
+    
+    col_param1, col_param2, col_param3 = st.columns([2, 2, 1])
+    
+    with col_param1:
+        param_key = st.text_input("Parameter Key", placeholder="e.g., loan_amount")
+    with col_param2:
+        param_value = st.text_input("Parameter Value", placeholder="e.g., 50000")
+    with col_param3:
+        if st.button("Add Parameter"):
+            if param_key and param_value:
+                st.session_state.custom_params.append({"key": param_key, "value": param_value})
+                st.rerun()
+    
+    # Display current custom parameters
+    if st.session_state.custom_params:
+        st.write("**Current Custom Parameters:**")
+        for i, param in enumerate(st.session_state.custom_params):
+            col_display1, col_display2, col_display3 = st.columns([2, 2, 1])
+            with col_display1:
+                st.write(f"**{param['key']}:**")
+            with col_display2:
+                st.write(param['value'])
+            with col_display3:
+                if st.button("Remove", key=f"remove_{i}"):
+                    st.session_state.custom_params.pop(i)
                     st.rerun()
-        
-        # Display current custom parameters
-        if st.session_state.custom_params:
-            st.write("**Current Custom Parameters:**")
-            for i, param in enumerate(st.session_state.custom_params):
-                col_display1, col_display2, col_display3 = st.columns([2, 2, 1])
-                with col_display1:
-                    st.write(f"**{param['key']}:**")
-                with col_display2:
-                    st.write(param['value'])
-                with col_display3:
-                    if st.button("Remove", key=f"remove_{i}"):
-                        st.session_state.custom_params.pop(i)
-                        st.rerun()
-    
-    with col2:
-        # System Prompt
-        st.markdown('<h2 class="section-header">System Prompt</h2>', unsafe_allow_html=True)
-        
-        # Load prompt from JSON config
-        system_prompt = st.text_area("System Prompt", value=st.session_state.call_system.get_ai_prompt(), height=400)
-        
-        # Generate formatted prompt
-        if st.button("Preview Formatted Prompt"):
-            # Create customer data dictionary using JSON config as base
-            customer_data = st.session_state.call_system.get_customer_info().copy()
-            customer_data.update({
-                "name": customer_name,
-                "phone_number": destination_phone,
-                "gender": customer_gender
-            })
-            
-            # Add custom parameters
-            for param in st.session_state.custom_params:
-                customer_data[param['key']] = param['value']
-            
-            # Format the prompt
-            formatted_prompt = st.session_state.call_system.get_formatted_prompt(system_prompt, customer_data)
-            
-            st.text_area("Formatted Prompt Preview", value=formatted_prompt, height=200)
     
     # Configuration Status
     st.markdown('<h2 class="section-header">Configuration Status</h2>', unsafe_allow_html=True)
     
-    # Show secrets source
-    st.info("🔐 **Using Streamlit Secrets** (from `streamlit/secrets.toml`)")
-    
     missing_creds = st.session_state.call_system.validate_credentials()
     
-    st.subheader("✅ Required APIs")
-    required_apis = [
-        ("TWILIO_ACCOUNT_SID", "Twilio Account"),
-        ("TWILIO_AUTH_TOKEN", "Twilio Auth"),
-        ("ULTRAVOX_API_KEY", "Ultravox API"),
-        ("ELEVENLABS_API_KEY", "ElevenLabs API")
-    ]
-    
-    for api_key, api_name in required_apis:
-        if api_key not in missing_creds:
-            st.success(f"✅ {api_name}")
-        else:
-            st.error(f"❌ {api_name}")
+    if missing_creds:
+        st.error("Requirements missing. Please update `streamlit/secrets.toml`.")
+    else:
+        st.success("Requirements are successful.")
     
     # Call Controls
     st.markdown('<h2 class="section-header">Call Controls</h2>', unsafe_allow_html=True)
@@ -458,8 +406,8 @@ def main():
             missing_creds = st.session_state.call_system.validate_credentials()
             
             if missing_creds:
-                st.error(f"⚠️ **Required API keys missing:** {', '.join(missing_creds)}")
-                st.info("Please add these to your `streamlit/secrets.toml` file")
+                st.error(f"Required API keys missing: {', '.join(missing_creds)}")
+                st.info("Please add these credentials before initiating a call.")
             
             if not missing_creds:
                 # Create customer data dictionary using JSON config as base
@@ -473,6 +421,8 @@ def main():
                 # Add custom parameters
                 for param in st.session_state.custom_params:
                     customer_data[param['key']] = param['value']
+                
+                system_prompt = st.session_state.call_system.get_ai_prompt()
                 
                 # Format the prompt
                 formatted_prompt = st.session_state.call_system.get_formatted_prompt(system_prompt, customer_data)
@@ -538,9 +488,9 @@ def main():
                     st.subheader("Conversation Transcript")
                     for message in call['transcript']:
                         if message['role'] == 'USER':
-                            st.markdown(f"**👤 Customer ({message['timestamp']}):** {message['text']}")
+                            st.markdown(f"**Customer ({message['timestamp']}):** {message['text']}")
                         else:
-                            st.markdown(f"**🤖 AI Agent ({message['timestamp']}):** {message['text']}")
+                            st.markdown(f"**AI Agent ({message['timestamp']}):** {message['text']}")
 
 if __name__ == "__main__":
     main()
